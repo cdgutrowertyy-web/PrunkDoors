@@ -3,14 +3,15 @@ import tkinter as tk
 from tkinter import messagebox
 import pygame
 import keyboard
+import winsound  # Для звуковых писков Windows
 
 # ---------- НАСТРОЙКИ ----------
 SECRET = "AAAYOUASLABAK"          # капсом
 SECRET_TIMEOUT = 15                # сек на ввод серии
 DISARM_AFTER = 5 * 60              # 5 минут до «выключения»
-COIN_NAME = "coin.jpg"             # Имя картинки монетки (теперь jpg)
+COIN_NAME = "coin.jpg"
 COINS_NEEDED = 5
-COIN_FOLDERS = [                   # куда «разбросать» монетки
+COIN_FOLDERS = [
     os.path.expanduser("~/Documents"),
     os.path.expanduser("~/Downloads"),
     os.path.expanduser("~/Desktop"),
@@ -23,27 +24,38 @@ BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(BASE, "assets")
 STATE = {"disarmed": False, "collected": 0, "buffer": "", "last_key": 0.0}
 
+# Смешные сообщения для хаоса
+CHAOS_MESSAGES = [
+    "ОШИБКА: Монета застряла в дисководе",
+    "DORS.exe требует шаурму для продолжения",
+    "Внимание: Кот взломал базу данных",
+    "Монетка найдена... шутка",
+    "Система перегрелась от смеха",
+    "Нажми ОК, чтобы получить еще одну ошибку",
+    "Твой сон украден DORS",
+    "Данные отправлены в штаб Раша"
+]
+
 # ---------- 1. СКРИМЕР ----------
 def play_screamer():
     try:
         pygame.init()
         screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         pygame.display.set_caption("")
-        img_path = os.path.join(ASSETS, "rush_scream.jpg") # Теперь jpg
+        img_path = os.path.join(ASSETS, "rush_scream.jpg")
         img = pygame.image.load(img_path)
         img = pygame.transform.scale(img, screen.get_size())
 
-        # Блок со звуком оставил на случай, если решишь добавить его позже
         try:
             pygame.mixer.init()
             pygame.mixer.music.load(os.path.join(ASSETS, "scream.wav"))
             pygame.mixer.music.play()
         except Exception:
-            pass # Если звука нет, просто пропускаем
+            pass
 
         start = time.time()
         clock = pygame.time.Clock()
-        while time.time() - start < 3:      # 3 секунды скримера
+        while time.time() - start < 3:
             for e in pygame.event.get():
                 if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                     pygame.quit()
@@ -72,7 +84,49 @@ def scatter_coins():
             continue
     return placed
 
-# ---------- 3. ГЛАВНОЕ ОКНО ----------
+# ---------- 3. ХАОС (ОКНА) ----------
+def spawn_chaos_window(root):
+    if STATE["disarmed"]: return
+    
+    win = tk.Toplevel(root)
+    win.title("System Error")
+    # Окно поверх всех
+    win.attributes("-topmost", True)
+    
+    # Рандомная позиция
+    x = random.randint(100, root.winfo_screenwidth() - 300)
+    y = random.randint(100, root.winfo_screenheight() - 200)
+    win.geometry(f"300x150+{x}+{y}")
+    
+    msg = random.choice(CHAOS_MESSAGES)
+    tk.Label(win, text=msg, font=("Segoe UI", 12, "bold"), fg="red").pack(pady=20)
+    
+    # Кнопка ОК, которая открывает новое окно
+    def on_ok():
+        winsound.Beep(random.choice([800, 1000, 1200]), 200) # Пищим
+        win.destroy()
+        spawn_chaos_window(root) # Открываем еще одно!
+    
+    tk.Button(win, text="OK", command=on_ok, width=10).pack()
+    
+    # Окно, которое убегает от курсора
+    def flee(event):
+        new_x = x + random.randint(-100, 100)
+        new_y = y + random.randint(-100, 100)
+        win.geometry(f"+{new_x}+{new_y}")
+    
+    # Если это "убегающее" окно (рандомно)
+    if random.random() < 0.3: 
+        win.bind("<Enter>", flee)
+    
+    # Пищим при появлении
+    try: winsound.Beep(500, 100)
+    except: pass
+    
+    # Закрываем через 10 секунд, если не нажали
+    win.after(10000, win.destroy)
+
+# ---------- 4. ГЛАВНОЕ ОКНО ----------
 class PrankApp:
     def __init__(self, root, coin_paths):
         self.root = root
@@ -114,12 +168,20 @@ class PrankApp:
         self.dropzone.bind("<Button-1>", lambda e: self.collect_one())
 
         tk.Label(root,
-                 text="Экстренный выход: введи секретный код (капсом, 15 сек на серию)",
+                 text="Экстренный выход: введи секретный код (капсом)",
                  fg="gray", bg="#1a1a1a",
                  font=("Segoe UI", 12)).pack(side="bottom", pady=5)
 
         self.root.bind("<Key>", self.on_key)
         self.tick_timer()
+        self.chaos_loop() # Запускаем хаос
+
+    def chaos_loop(self):
+        if STATE["disarmed"]: return
+        # Открываем окно хаоса каждые 7-12 секунд
+        spawn_chaos_window(self.root)
+        delay = random.randint(7000, 12000)
+        self.root.after(delay, self.chaos_loop)
 
     def collect_one(self, path=None):
         if self.collected >= COINS_NEEDED:
@@ -150,8 +212,7 @@ class PrankApp:
         self.root.destroy()
 
     def tick_timer(self):
-        if STATE["disarmed"]:
-            return
+        if STATE["disarmed"]: return
         elapsed = time.time() - self.start_time
         left = max(0, DISARM_AFTER - int(elapsed))
         m, s = divmod(left, 60)
@@ -175,8 +236,9 @@ class PrankApp:
         win.bind("<Escape>", lambda e: (win.destroy(), self.root.destroy()))
 
     def success(self):
+        STATE["disarmed"] = True
         self.cleanup_coins()
-        messagebox.showinfo("DORS.exe", "Все монеты собраны! Ты спасён 😎\n\n"
+        messagebox.showinfo("DORS.exe", "Все монеты собраны! Ты спасен!\n\n"
                                         "С тебя шаурма автору розыгрыша.")
         self.root.destroy()
 
@@ -188,12 +250,11 @@ class PrankApp:
             except Exception:
                 pass
 
-# ---------- 4. ГЛОБАЛЬНЫЙ ХОТКЕЙ (запасной выход) ----------
+# ---------- 5. ГЛОБАЛЬНЫЙ ХОТКЕЙ ----------
 def global_hotkey_watcher():
     buffer = {"s": "", "t": 0.0}
     def on_key(e):
-        if e.event_type != "down":
-            return
+        if e.event_type != "down": return
         now = time.time()
         if now - buffer["t"] > SECRET_TIMEOUT:
             buffer["s"] = ""
@@ -202,14 +263,13 @@ def global_hotkey_watcher():
         if len(name) == 1:
             buffer["s"] = (buffer["s"] + name)[-len(SECRET):]
             if buffer["s"].endswith(SECRET):
-                os._exit(0)  # мгновенный аварийный выход
+                os._exit(0) 
     try:
         keyboard.hook(on_key)
         keyboard.wait()
     except:
         pass
 
-# ---------- 5. ЗАПУСК ----------
 def main():
     play_screamer()
     coins = scatter_coins()
