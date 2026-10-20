@@ -8,7 +8,7 @@ import keyboard
 SECRET = "AAAYOUASLABAK"          # капсом
 SECRET_TIMEOUT = 15                # сек на ввод серии
 DISARM_AFTER = 5 * 60              # 5 минут до «выключения»
-COIN_NAME = "coin.png"             # Имя картинки монетки
+COIN_NAME = "coin.jpg"             # Имя картинки монетки (теперь jpg)
 COINS_NEEDED = 5
 COIN_FOLDERS = [                   # куда «разбросать» монетки
     os.path.expanduser("~/Documents"),
@@ -29,16 +29,17 @@ def play_screamer():
         pygame.init()
         screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         pygame.display.set_caption("")
-        img_path = os.path.join(ASSETS, "rush_scream.png")
+        img_path = os.path.join(ASSETS, "rush_scream.jpg") # Теперь jpg
         img = pygame.image.load(img_path)
         img = pygame.transform.scale(img, screen.get_size())
 
+        # Блок со звуком оставил на случай, если решишь добавить его позже
         try:
             pygame.mixer.init()
             pygame.mixer.music.load(os.path.join(ASSETS, "scream.wav"))
             pygame.mixer.music.play()
         except Exception:
-            pass
+            pass # Если звука нет, просто пропускаем
 
         start = time.time()
         clock = pygame.time.Clock()
